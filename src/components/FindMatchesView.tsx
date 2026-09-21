@@ -22,12 +22,17 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
   const [showRadiusModal, setShowRadiusModal] = useState(false);
   const [selectedMapMatch, setSelectedMapMatch] = useState<Match | null>(null);
 
-  // Filter matches
+  // Filter matches defensively
   const filteredMatches = matches.filter((match) => {
+    const teamName = match.teamName || '';
+    const venue = match.venue || '';
+    
     const matchesQuery =
-      match.teamName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      match.venue.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesDistance = match.distanceKm <= selectedRadius;
+      teamName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      venue.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const distance = match.distanceKm ?? 0;
+    const matchesDistance = distance <= selectedRadius;
     const matchesLevel = levelFilter === 'ALL' || match.level === levelFilter;
     const matchesFormat = formatFilter === 'ALL' || match.format === formatFilter;
 
@@ -173,15 +178,15 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
                       {/* Team Logo Badge */}
                       <div className="w-12 h-12 rounded-full border-2 border-[#2d3449] bg-[#0b1326] overflow-hidden shrink-0 flex items-center justify-center p-0.5 shadow-sm">
                         <img
-                          src={match.teamLogo}
-                          alt={match.teamName}
+                          src={match.teamLogo || 'https://images.unsplash.com/photo-1614630125192-0d3af12318be?w=150'}
+                          alt={match.teamName || 'Team'}
                           className="w-full h-full object-cover rounded-full"
                         />
                       </div>
 
                       <div>
                         <h3 className="font-bold text-lg text-[#dae2fd] leading-tight">
-                          {match.teamName}
+                          {match.teamName || 'Team Name'}
                         </h3>
                         <div className="flex items-center gap-2 mt-1">
                           {match.level === 'ELITE' ? (
@@ -199,7 +204,7 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
                           )}
                           <span className="w-1 h-1 rounded-full bg-[#bbcabf]" />
                           <span className="text-[#bbcabf] text-xs font-medium">
-                            {match.format}
+                            {match.format || '7v7'}
                           </span>
                         </div>
                       </div>
@@ -228,9 +233,9 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
                           DATE & TIME
                         </span>
                         <span className="text-xs font-medium text-[#dae2fd] mt-0.5">
-                          {match.date}
+                          {match.date || 'TBD'}
                         </span>
-                        <span className="text-xs text-[#bbcabf]">{match.time}</span>
+                        <span className="text-xs text-[#bbcabf]">{match.time || ''}</span>
                       </div>
                     </div>
 
@@ -243,10 +248,10 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
                           VENUE
                         </span>
                         <span className="text-xs font-medium text-[#dae2fd] mt-0.5 line-clamp-1">
-                          {match.venue}
+                          {match.venue || 'TBD'}
                         </span>
                         <span className="text-[11px] text-[#7bd0ff] mt-0.5 font-medium">
-                          {match.distanceKm} km away
+                          {match.distanceKm ?? 0} km away
                         </span>
                       </div>
                     </div>
@@ -256,7 +261,7 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
                   <div className="mt-1 pt-3 border-t border-[#2d3449] flex gap-3 items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="flex -space-x-2">
-                        {match.playerAvatars.map((avatarUrl, idx) => (
+                        {(match.playerAvatars || []).map((avatarUrl, idx) => (
                           <img
                             key={idx}
                             src={avatarUrl}
@@ -265,7 +270,7 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
                           />
                         ))}
                         <div className="w-6 h-6 rounded-full border border-[#0b1326] bg-[#222a3d] flex items-center justify-center text-[10px] font-bold text-[#dae2fd]">
-                          +{match.extraPlayersCount}
+                          +{match.extraPlayersCount || 0}
                         </div>
                       </div>
                       <span className="text-xs text-[#bbcabf] hidden sm:inline">
@@ -306,13 +311,9 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
           <div className="relative w-full h-[460px] bg-[#131b2e] rounded-2xl border border-[#2d3449] overflow-hidden shadow-inner flex flex-col">
             {/* Soccer Pitch Graphic Background */}
             <div className="absolute inset-0 bg-[#0f1d33] opacity-80">
-              {/* Field border */}
               <div className="absolute inset-4 border-2 border-white/20 rounded-lg pointer-events-none" />
-              {/* Halfway line */}
               <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-white/20 pointer-events-none" />
-              {/* Center circle */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 border-2 border-white/20 rounded-full pointer-events-none" />
-              {/* Goal boxes */}
               <div className="absolute top-4 left-1/2 -translate-x-1/2 w-36 h-16 border-b-2 border-x-2 border-white/20 pointer-events-none" />
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-36 h-16 border-t-2 border-x-2 border-white/20 pointer-events-none" />
             </div>
@@ -320,7 +321,6 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
             {/* Map Pins */}
             <div className="relative z-10 w-full h-full p-6">
               {filteredMatches.map((m, index) => {
-                // Calculate position based on index or lat/lng mock
                 const positions = [
                   { top: '30%', left: '40%' },
                   { top: '65%', left: '70%' },
@@ -339,16 +339,16 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
                     <div className="flex flex-col items-center">
                       <div className="relative p-1 bg-[#0b1326] border-2 border-[#4edea3] rounded-full shadow-[0_0_15px_rgba(78,222,163,0.5)] group-hover:scale-110 transition-transform">
                         <img
-                          src={m.teamLogo}
-                          alt={m.teamName}
+                          src={m.teamLogo || 'https://images.unsplash.com/photo-1614630125192-0d3af12318be?w=150'}
+                          alt={m.teamName || 'Team'}
                           className="w-8 h-8 rounded-full object-cover"
                         />
                         <div className="absolute -top-1 -right-1 bg-[#4edea3] text-[#003824] text-[9px] font-extrabold px-1 rounded-full">
-                          {m.format}
+                          {m.format || '7v7'}
                         </div>
                       </div>
                       <div className="bg-[#0b1326]/90 border border-[#2d3449] text-white text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 whitespace-nowrap shadow-md">
-                        {m.teamName} ({m.distanceKm}km)
+                        {m.teamName || 'Team'} ({m.distanceKm ?? 0}km)
                       </div>
                     </div>
                   </button>
@@ -361,14 +361,14 @@ export const FindMatchesView: React.FC<FindMatchesViewProps> = ({
               <div className="absolute bottom-3 left-3 right-3 z-30 bg-[#171f33] border border-[#4edea3]/50 rounded-xl p-3 shadow-2xl flex items-center justify-between gap-3 animate-fade-in">
                 <div className="flex items-center gap-3">
                   <img
-                    src={selectedMapMatch.teamLogo}
-                    alt={selectedMapMatch.teamName}
+                    src={selectedMapMatch.teamLogo || 'https://images.unsplash.com/photo-1614630125192-0d3af12318be?w=150'}
+                    alt={selectedMapMatch.teamName || 'Team'}
                     className="w-10 h-10 rounded-full object-cover border border-[#4edea3]"
                   />
                   <div>
-                    <h4 className="font-bold text-sm text-white">{selectedMapMatch.teamName}</h4>
+                    <h4 className="font-bold text-sm text-white">{selectedMapMatch.teamName || 'Team'}</h4>
                     <p className="text-xs text-[#bbcabf]">
-                      {selectedMapMatch.venue} • {selectedMapMatch.time}
+                      {selectedMapMatch.venue || 'TBD'} • {selectedMapMatch.time || ''}
                     </p>
                   </div>
                 </div>

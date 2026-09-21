@@ -14,13 +14,27 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
 }) => {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [showFullRosterModal, setShowFullRosterModal] = useState(false);
-  const [teamAvailability, setTeamAvailability] = useState(team.availability);
+  const [teamAvailability, setTeamAvailability] = useState(
+    team?.availability || [
+      { day: 'Mon', short: 'M', available: true },
+      { day: 'Tue', short: 'T', available: false },
+      { day: 'Wed', short: 'W', available: true },
+      { day: 'Thu', short: 'T', available: false },
+      { day: 'Fri', short: 'F', available: true },
+      { day: 'Sat', short: 'S', available: true },
+      { day: 'Sun', short: 'S', available: false },
+    ]
+  );
 
   const toggleDayAvailability = (index: number) => {
     const updated = [...teamAvailability];
     updated[index].available = !updated[index].available;
     setTeamAvailability(updated);
   };
+
+  const roster = team?.roster || [];
+  const recentForm = team?.recentForm || [];
+  const recentMatches = team?.recentMatches || [];
 
   return (
     <div className="flex flex-col w-full relative pb-28 min-h-screen">
@@ -36,8 +50,8 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
           <div className="relative w-32 h-32 rounded-full p-1 bg-gradient-to-br from-[#4edea3] to-[#171f33] shadow-[0_0_24px_rgba(78,222,163,0.3)]">
             <div className="w-full h-full rounded-full overflow-hidden border-2 border-[#171f33] bg-[#2d3449] flex items-center justify-center">
               <img
-                src={team.crest}
-                alt={team.name}
+                src={team?.crest || 'https://images.unsplash.com/photo-1614630125192-0d3af12318be?w=150'}
+                alt={team?.name || 'Team Crest'}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -54,13 +68,13 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
 
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl font-extrabold text-[#dae2fd] tracking-tight">
-              {team.name}
+              {team?.name || 'My Team'}
             </h1>
             <div className="flex items-center justify-center gap-1.5 text-[#bbcabf] text-sm">
               <span className="material-symbols-outlined text-[16px] text-[#7bd0ff]">
                 location_on
               </span>
-              <span>{team.location}</span>
+              <span>{team?.location || 'Local Pitch'}</span>
             </div>
           </div>
         </section>
@@ -75,7 +89,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
               >
                 star
               </span>
-              <span className="text-xl font-extrabold">{team.rating}</span>
+              <span className="text-xl font-extrabold">{team?.rating ?? 5.0}</span>
             </div>
             <span className="text-[10px] font-bold text-[#bbcabf] uppercase tracking-wider">
               Fair Play
@@ -85,7 +99,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
           <div className="flex-1 flex flex-col items-center justify-center gap-1 p-2">
             <div className="flex items-center gap-1 text-[#7bd0ff]">
               <span className="material-symbols-outlined text-[20px]">timeline</span>
-              <span className="text-xl font-extrabold text-[#dae2fd]">{team.league}</span>
+              <span className="text-xl font-extrabold text-[#dae2fd]">{team?.league || 'Division 1'}</span>
             </div>
             <span className="text-[10px] font-bold text-[#bbcabf] uppercase tracking-wider">
               Current League
@@ -100,11 +114,11 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
             <div className="flex items-center gap-2 mb-2 relative z-10">
               <span className="material-symbols-outlined text-[#4edea3]">sports_soccer</span>
               <span className="font-bold text-base text-[#dae2fd]">
-                {team.playstyleTitle}
+                {team?.playstyleTitle || 'High Press & Fast Counter'}
               </span>
             </div>
             <p className="text-sm text-[#bbcabf] leading-relaxed relative z-10">
-              {team.playstyleDescription}
+              {team?.playstyleDescription || 'Aggressive forward pressing team looking for fast transitions and structured build-up play.'}
             </p>
           </div>
         </section>
@@ -121,7 +135,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
           <div className="flex gap-2">
             {teamAvailability.map((item, idx) => (
               <button
-                key={item.day}
+                key={item.day || idx}
                 onClick={() => toggleDayAvailability(idx)}
                 className={`flex-1 py-3 rounded-lg border text-center transition-all ${
                   item.available
@@ -145,7 +159,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-[#dae2fd]">
-              Active Roster ({team.roster.length})
+              Active Roster ({roster.length})
             </h2>
             <button
               onClick={() => setShowFullRosterModal(true)}
@@ -156,7 +170,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
           </div>
 
           <div className="flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar">
-            {team.roster.map((player) => (
+            {roster.map((player) => (
               <button
                 key={player.id}
                 onClick={() => setSelectedPlayer(player)}
@@ -164,7 +178,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
               >
                 <div className="w-16 h-16 rounded-full border-2 border-[#2d3449] group-hover:border-[#4edea3] overflow-hidden relative shadow-sm transition-colors">
                   <img
-                    src={player.avatar}
+                    src={player.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
                     alt={player.name}
                     className="w-full h-full object-cover"
                   />
@@ -199,7 +213,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-[#dae2fd]">Recent Form</h2>
             <div className="flex gap-1">
-              {team.recentForm.map((result, idx) => (
+              {recentForm.map((result, idx) => (
                 <span
                   key={idx}
                   className={`w-6 h-6 rounded flex items-center justify-center font-bold text-xs ${
@@ -217,7 +231,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
           </div>
 
           <div className="flex flex-col gap-2">
-            {team.recentMatches.map((m) => (
+            {recentMatches.map((m) => (
               <div
                 key={m.id}
                 className={`bg-[#171f33] rounded-lg p-3 flex items-center justify-between border-l-4 ${
@@ -231,7 +245,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-[#222a3d] flex items-center justify-center border border-[#3c4a42]/30">
                     <span className="text-[10px] font-bold text-[#dae2fd]">
-                      {m.opponent.split(' ')[1] || 'FC'}
+                      {m.opponent?.split(' ')[1] || 'FC'}
                     </span>
                   </div>
                   <div className="flex flex-col">
@@ -279,7 +293,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
 
             <div className="flex items-center gap-4">
               <img
-                src={selectedPlayer.avatar}
+                src={selectedPlayer.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
                 alt={selectedPlayer.name}
                 className="w-16 h-16 rounded-full object-cover border-2 border-[#4edea3]"
               />
@@ -328,7 +342,7 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
           <div className="bg-[#171f33] border border-[#2d3449] w-full max-w-md rounded-2xl p-5 flex flex-col gap-4 max-h-[80vh] overflow-y-auto animate-fade-in">
             <div className="flex justify-between items-center border-b border-[#2d3449] pb-3">
               <h3 className="font-bold text-lg text-white">
-                Full Active Roster ({team.roster.length})
+                Full Active Roster ({roster.length})
               </h3>
               <button
                 onClick={() => setShowFullRosterModal(false)}
@@ -339,25 +353,25 @@ export const MyTeamView: React.FC<MyTeamViewProps> = ({
             </div>
 
             <div className="flex flex-col gap-3">
-              {team.roster.map((p) => (
+              {roster.map((p) => (
                 <div
                   key={p.id}
                   className="flex items-center justify-between p-3 bg-[#222a3d] rounded-xl border border-[#2d3449]"
                 >
                   <div className="flex items-center gap-3">
                     <img
-                      src={p.avatar}
+                      src={p.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
                       alt={p.name}
                       className="w-10 h-10 rounded-full object-cover border border-[#4edea3]"
                     />
                     <div>
                       <h4 className="font-bold text-sm text-white">{p.name}</h4>
-                      <p className="text-xs text-[#bbcabf]">{p.position}</p>
+                      <p className="text-xs text-[#bbcabf]">{p.position || 'Player'}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <span className="text-xs font-bold text-[#4edea3]">
-                      {p.goals} goals
+                      {p.goals ?? 0} goals
                     </span>
                   </div>
                 </div>

@@ -1,13 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+// 1. Tipos de datos
 import { Match, Team, ActiveChat, ChatMessage, NotificationItem, SkillLevel, MatchFormat } from './types';
-import {
-  INITIAL_MATCHES,
-  INITIAL_MY_TEAM,
-  INITIAL_ACTIVE_CHATS,
-  INITIAL_CHAT_MESSAGES,
-  INITIAL_NOTIFICATIONS,
-  USER_CAPTAIN,
-} from './data/mockData';
+
+// 2. Componentes visuales
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { FindMatchesView } from './components/FindMatchesView';
@@ -17,20 +12,44 @@ import { AlertsView } from './components/AlertsView';
 import { CreateMatchModal } from './components/CreateMatchModal';
 import { RosterInviteModal } from './components/RosterInviteModal';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState<'matches' | 'team' | 'chat' | 'alerts'>('matches');
-  const [matches, setMatches] = useState<Match[]>(INITIAL_MATCHES);
-  const [team, setTeam] = useState<Team>(INITIAL_MY_TEAM);
-  const [activeChats, setActiveChats] = useState<ActiveChat[]>(INITIAL_ACTIVE_CHATS);
-  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(INITIAL_CHAT_MESSAGES);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+// 3. Cliente de Supabase y funciones de API
+import { supabase } from './supabase';
+import { fetchNotifications, markAllNotificationsAsRead, acceptChallenge } from './services/api';
 
+export default function App() {
+  // --- ESTADOS DE NAVEGACIÓN Y PANTALLAS ---
+  const [activeTab, setActiveTab] = useState<'matches' | 'team' | 'chat' | 'alerts'>('matches');
+
+  // --- ESTADOS DE DATOS ---
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [team, setTeam] = useState<Team>({
+    id: 't_cityfc',
+    name: 'City FC',
+    badge: 'https://images.unsplash.com/photo-1614632537190-23e4146777db?auto=format&fit=crop&q=80&w=200',
+    coverImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=800',
+    level: 'Intermediate',
+    format: '7v7',
+    record: '12W - 4L - 2D',
+    captainName: 'Alexis',
+    captainAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+    roster: [],
+  });
+  const [activeChats, setActiveChats] = useState<ActiveChat[]>([]);
+  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  // --- ESTADOS DE MODALES Y NOTIFICACIONES MENTALES (TOAST) ---
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const [challengeTargetTeam, setChallengeTargetTeam] = useState<string | undefined>(undefined);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // ID de usuario y equipo activos (Temporales mientras configuramos Login)
+  const currentUserId = 'usr_1';
+  const currentTeamId = 't_cityfc';
+
+  // --- FUNCIÓN PARA MOSTRAR MENSAJES FLOTANTES ---
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -38,7 +57,71 @@ export default function App() {
     }, 3000);
   };
 
-  // Challenge a match or team
+  // --- Cargar Partidos desde Supabase ---
+  useEffect(() => {
+    async function loadMatches() {
+      const { data, error } = await supabase
+        .from('match_requests')
+        .select(`
+          id,
+          venue_name,
+          match_date,
+          price_split_info,
+          status,
+          host_team:teams!host_team_id (
+            id,
+            name,
+            badge_url,
+            level,
+            format
+          )
+        `)
+        .eq('status', 'open');
+
+      if (!error && data) {
+        const formatted: Match[] = data.map((item: any) => ({
+          id: item.id,
+          teamName: item.host_team?.name || 'Equipo Rival',
+          badge: item.host_team?.badge_url || 'https://via.placeholder.com/150',
+          venue: item.venue_name,
+          date: new Date(item.match_date).toLocaleDateString(),
+          time: new Date(item.match_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          format: item.host_team?.format || '7v7',
+          level: item.host_team?.level || 'Intermediate',
+          feePerPlayer: item.price_split_info || '$5/player',
+          isBookmarked: false,
+        }));
+        setMatches(formatted);
+      }
+    }
+
+    if (activeTab === 'matches') {
+      loadMatches();
+    }
+  }, [activeTab]);
+
+  // --- Cargar Notificaciones desde Supabase ---
+  useEffect(() => {
+    async function loadAlerts() {
+      const data = await fetchNotifications(currentUserId);
+      if (data) {
+        const formattedAlerts: NotificationItem[] = data.map((n: any) => ({
+          id: n.id,
+          type: n.type,
+          title: n.title,
+          body: n.body,
+          time: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          read: n.read,
+          matchId: n.match_id,
+        }));
+        setNotifications(formattedAlerts);
+      }
+    }
+
+    loadAlerts();
+  }, [activeTab]);
+
+  // --- ACCIONES Y ACCIONES DE EVENTOS ---
   const handleChallengeMatch = (match: Match) => {
     setChallengeTargetTeam(match.teamName);
     setIsChallengeModalOpen(true);
@@ -54,7 +137,7 @@ export default function App() {
       prev.map((m) => {
         if (m.id === matchId) {
           const nextState = !m.isBookmarked;
-          showToast(nextState ? `Saved ${m.teamName} to bookmarks` : `Removed bookmark`);
+          showToast(nextState ? `Guardado ${m.teamName} en favoritos` : `Eliminado de favoritos`);
           return { ...m, isBookmarked: nextState };
         }
         return m;
@@ -62,8 +145,8 @@ export default function App() {
     );
   };
 
-  // Submit Challenge / Create Match Request
-  const handleSubmitMatch = (data: {
+  // Crear o publicar un nuevo partido
+  const handleSubmitMatch = async (data: {
     teamName: string;
     venue: string;
     date: string;
@@ -72,115 +155,62 @@ export default function App() {
     level: SkillLevel;
     feePerPlayer: string;
   }) => {
-    const newChatId = `chat_${Date.now()}`;
-    const opponent = data.teamName;
+    // Insertar en Supabase
+    const { error } = await supabase.from('match_requests').insert([
+      {
+        host_team_id: currentTeamId,
+        venue_name: data.venue,
+        match_date: `${data.date}T${data.time}:00Z`,
+        price_split_info: `${data.feePerPlayer}/player`,
+        status: 'open',
+      },
+    ]);
 
-    // Create new active chat
-    const newChat: ActiveChat = {
-      matchId: newChatId,
-      title: `City FC vs. ${opponent}`,
-      timeLocation: `${data.date}, ${data.time}`,
-      venue: data.venue,
-      splitFee: `${data.feePerPlayer}/player`,
-      opponentName: opponent,
-      opponentCaptain: 'Captain',
-      unreadCount: 0,
-    };
+    if (error) {
+      showToast('Error al publicar el partido en Supabase');
+      return;
+    }
 
-    setActiveChats((prev) => [newChat, ...prev]);
-
-    // Add initial system / user message
-    const initialMsg: ChatMessage = {
-      id: `msg_init_${Date.now()}`,
-      matchId: newChatId,
-      senderName: 'You',
-      senderTeam: 'City FC',
-      avatar: USER_CAPTAIN.avatar,
-      text: `Hey! Challenge issued for ${data.date} at ${data.time} (${data.venue}, ${data.format}). Looking forward to a great match!`,
-      time: 'Just now',
-      isUser: true,
-      isRead: true,
-    };
-
-    setMessages((prev) => ({
-      ...prev,
-      [newChatId]: [initialMsg],
-    }));
-
-    // Add notification
-    const newAlert: NotificationItem = {
-      id: `n_${Date.now()}`,
-      type: 'challenge',
-      title: `Challenge Sent to ${opponent}`,
-      body: `Match details: ${data.date} at ${data.time} • ${data.venue} (${data.format}).`,
-      time: 'Just now',
-      read: false,
-      matchId: newChatId,
-    };
-
-    setNotifications((prev) => [newAlert, ...prev]);
-
-    showToast(`Challenge sent to ${opponent}! Chat channel opened.`);
+    showToast(`¡Desafío publicado para ${data.teamName}!`);
+    setIsChallengeModalOpen(false);
     setActiveTab('chat');
   };
 
-  // Send message in chat
-  const handleSendMessage = (matchId: string, text: string) => {
+  // Enviar mensaje de chat
+  const handleSendMessage = async (matchId: string, text: string) => {
     const newMsg: ChatMessage = {
       id: `msg_${Date.now()}`,
       matchId,
-      senderName: 'You',
-      senderTeam: 'The Lions',
-      avatar: USER_CAPTAIN.avatar,
+      senderName: 'Tú',
+      senderTeam: team.name,
+      avatar: team.captainAvatar,
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isUser: true,
       isRead: true,
     };
 
-    setMessages((prev) => {
-      const existing = prev[matchId] || [];
-      return {
-        ...prev,
-        [matchId]: [...existing, newMsg],
-      };
-    });
+    setMessages((prev) => ({
+      ...prev,
+      [matchId]: [...(prev[matchId] || []), newMsg],
+    }));
 
-    // Simulate automated realistic response after 1.5 seconds
-    setTimeout(() => {
-      const currentChat = activeChats.find((c) => c.matchId === matchId);
-      const responses = [
-        'Awesome! I will update our team group chat right away.',
-        'Perfect! See you at the pitch.',
-        'Sounds good. We will be ready!',
-        'Got it! Thanks Mark!',
-      ];
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-
-      const replyMsg: ChatMessage = {
-        id: `msg_reply_${Date.now()}`,
-        matchId,
-        senderName: currentChat?.opponentCaptain || 'Alex',
-        senderTeam: currentChat?.opponentName || 'City FC',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-        text: randomResponse,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isUser: false,
-      };
-
-      setMessages((prev) => ({
-        ...prev,
-        [matchId]: [...(prev[matchId] || []), replyMsg],
-      }));
-    }, 1500);
+    // Guardar también en base de datos
+    await supabase.from('chat_messages').insert([
+      {
+        match_id: matchId,
+        sender_id: currentUserId,
+        content: text,
+      },
+    ]);
   };
 
-  // Add new player to roster
-  const handleAddPlayer = (name: string, position: string) => {
+  // Agregar jugador al equipo
+  const handleAddPlayer = async (name: string, position: string) => {
     const newPlayer = {
       id: `p_${Date.now()}`,
       name,
-      avatar: `https://images.unsplash.com/photo-${1500648767791 + Math.floor(Math.random() * 1000)}?auto=format&fit=crop&q=80&w=200`,
+      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200`,
       role: 'Player',
       position,
       goals: 0,
@@ -193,28 +223,31 @@ export default function App() {
       roster: [...prev.roster, newPlayer],
     }));
 
-    showToast(`${name} added to ${team.name} roster!`);
+    showToast(`¡${name} agregado a la plantilla de ${team.name}!`);
   };
 
-  // Notification actions
-  const handleAcceptChallenge = (notificationId: string) => {
+  // Aceptar Desafío desde Notificaciones
+  const handleAcceptChallenge = async (notificationId: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
     );
-    showToast('Match challenge accepted! Redirecting to match chat...');
+    showToast('¡Desafío aceptado! Redirigiendo al chat del partido...');
     setActiveTab('chat');
   };
 
-  const handleMarkAllRead = () => {
+  // Marcar todas las notificaciones como leídas
+  const handleMarkAllRead = async () => {
+    await markAllNotificationsAsRead(currentUserId);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    showToast('All notifications marked as read.');
+    showToast('Todas las notificaciones marcadas como leídas.');
   };
 
+  // Contadores para insignias (badges)
   const unreadAlerts = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="bg-[#0b1326] min-h-screen text-[#dae2fd] max-w-lg mx-auto relative flex flex-col font-['Inter',sans-serif]">
-      {/* Toast Notification Banner */}
+      {/* Toast Banner Flotante */}
       {toastMessage && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#4edea3] text-[#003824] px-4 py-2.5 rounded-full text-xs font-bold shadow-2xl flex items-center gap-2 animate-fade-in border border-white/20">
           <span className="material-symbols-outlined text-base">check_circle</span>
@@ -222,14 +255,14 @@ export default function App() {
         </div>
       )}
 
-      {/* Top App Bar Header */}
+      {/* Encabezado Superior */}
       <Navbar
         activeTab={activeTab}
         unreadAlertsCount={unreadAlerts}
         onProfileClick={() => setIsProfileModalOpen(true)}
       />
 
-      {/* Main Tab Screen Content */}
+      {/* Contenido Principal de Pestañas */}
       <main className="flex-1 pt-16">
         {activeTab === 'matches' && (
           <FindMatchesView
@@ -269,7 +302,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
+      {/* Navegación Inferior */}
       <BottomNav
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
@@ -277,7 +310,7 @@ export default function App() {
         unreadAlertsCount={unreadAlerts}
       />
 
-      {/* Create / Host Match Modal */}
+      {/* Modal Crear Partido */}
       <CreateMatchModal
         isOpen={isChallengeModalOpen}
         onClose={() => setIsChallengeModalOpen(false)}
@@ -285,14 +318,14 @@ export default function App() {
         onSubmitMatch={handleSubmitMatch}
       />
 
-      {/* Roster Invite Player Modal */}
+      {/* Modal Invitar Jugador */}
       <RosterInviteModal
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
         onAddPlayer={handleAddPlayer}
       />
 
-      {/* Profile & Captain Modal */}
+      {/* Modal Perfil del Capitán */}
       {isProfileModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#171f33] border border-[#2d3449] w-full max-w-sm rounded-2xl p-6 flex flex-col gap-4 animate-fade-in relative shadow-2xl">
@@ -305,27 +338,27 @@ export default function App() {
 
             <div className="flex flex-col items-center text-center gap-2">
               <img
-                src={USER_CAPTAIN.avatar}
-                alt={USER_CAPTAIN.name}
+                src={team.captainAvatar}
+                alt={team.captainName}
                 className="w-20 h-20 rounded-full object-cover border-2 border-[#4edea3] shadow-md"
               />
-              <h3 className="text-xl font-bold text-white">{USER_CAPTAIN.name}</h3>
+              <h3 className="text-xl font-bold text-white">{team.captainName}</h3>
               <p className="text-xs text-[#4edea3] font-bold bg-[#4edea3]/10 px-2.5 py-1 rounded-full border border-[#4edea3]/30">
-                Captain • {USER_CAPTAIN.teamName}
+                Capitán • {team.name}
               </p>
             </div>
 
             <div className="bg-[#0b1326] p-3 rounded-xl border border-[#2d3449] flex flex-col gap-2 text-xs text-[#bbcabf]">
               <div className="flex justify-between py-1 border-b border-[#2d3449]/50">
-                <span>Location</span>
-                <span className="text-white font-medium">Eastside Sports Complex</span>
+                <span>Ubicación</span>
+                <span className="text-white font-medium">Canchas Locales</span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2d3449]/50">
-                <span>Matches Organized</span>
-                <span className="text-[#4edea3] font-bold">24 matches</span>
+                <span>Partidos Organizados</span>
+                <span className="text-[#4edea3] font-bold">24 partidos</span>
               </div>
               <div className="flex justify-between py-1">
-                <span>Fair Play Score</span>
+                <span>Fair Play</span>
                 <span className="text-[#7bd0ff] font-bold">4.9 ★</span>
               </div>
             </div>
@@ -334,7 +367,7 @@ export default function App() {
               onClick={() => setIsProfileModalOpen(false)}
               className="w-full bg-[#222a3d] text-white font-bold h-10 rounded-xl text-xs hover:bg-[#2d3449]"
             >
-              Close Profile
+              Cerrar Perfil
             </button>
           </div>
         </div>

@@ -13,7 +13,7 @@ interface CreateMatchModalProps {
     format: MatchFormat;
     level: SkillLevel;
     feePerPlayer: string;
-  }) => void;
+  }) => Promise<void> | void;
 }
 
 export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
@@ -28,21 +28,30 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   const [format, setFormat] = useState<MatchFormat>('7v7');
   const [level, setLevel] = useState<SkillLevel>('INTERMEDIATE');
   const [fee, setFee] = useState('$5');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmitMatch({
-      teamName: targetTeamName || 'City FC',
-      venue,
-      date,
-      time,
-      format,
-      level,
-      feePerPlayer: fee,
-    });
-    onClose();
+    setIsSubmitting(true);
+
+    try {
+      await onSubmitMatch({
+        teamName: targetTeamName || 'City FC',
+        venue,
+        date,
+        time,
+        format,
+        level,
+        feePerPlayer: fee,
+      });
+      onClose();
+    } catch (error) {
+      console.error('Error submitting match:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -59,7 +68,11 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
                 : 'Post an open match request for nearby teams'}
             </p>
           </div>
-          <button onClick={onClose} className="text-[#bbcabf] hover:text-white">
+          <button 
+            onClick={onClose} 
+            disabled={isSubmitting}
+            className="text-[#bbcabf] hover:text-white disabled:opacity-50"
+          >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -75,6 +88,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
               onChange={(e) => setVenue(e.target.value)}
               className="w-full bg-[#222a3d] border border-[#2d3449] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#4edea3]"
               required
+              disabled={isSubmitting}
             />
           </div>
 
@@ -89,6 +103,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full bg-[#222a3d] border border-[#2d3449] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#4edea3]"
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div>
@@ -101,6 +116,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
                 onChange={(e) => setTime(e.target.value)}
                 className="w-full bg-[#222a3d] border border-[#2d3449] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#4edea3]"
                 required
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -114,6 +130,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
                 value={format}
                 onChange={(e) => setFormat(e.target.value as MatchFormat)}
                 className="w-full bg-[#222a3d] border border-[#2d3449] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#4edea3]"
+                disabled={isSubmitting}
               >
                 <option value="5v5">5v5</option>
                 <option value="7v7">7v7</option>
@@ -129,6 +146,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
                 value={level}
                 onChange={(e) => setLevel(e.target.value as SkillLevel)}
                 className="w-full bg-[#222a3d] border border-[#2d3449] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#4edea3]"
+                disabled={isSubmitting}
               >
                 <option value="BEGINNER">BEGINNER</option>
                 <option value="INTERMEDIATE">INTERMEDIATE</option>
@@ -146,14 +164,22 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
               value={fee}
               onChange={(e) => setFee(e.target.value)}
               className="w-full bg-[#222a3d] border border-[#2d3449] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#4edea3]"
+              disabled={isSubmitting}
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-[#4edea3] text-[#003824] font-extrabold h-12 rounded-xl text-base shadow-lg hover:bg-[#6ffbbe] transition-all mt-2"
+            disabled={isSubmitting}
+            className="w-full bg-[#4edea3] text-[#003824] font-extrabold h-12 rounded-xl text-base shadow-lg hover:bg-[#6ffbbe] transition-all mt-2 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {targetTeamName ? 'Send Match Challenge' : 'Publish Open Request'}
+            {isSubmitting ? (
+              <span>Publishing...</span>
+            ) : targetTeamName ? (
+              'Send Match Challenge'
+            ) : (
+              'Publish Open Request'
+            )}
           </button>
         </form>
       </div>

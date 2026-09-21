@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 interface RosterInviteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddPlayer: (name: string, position: string) => void;
+  onAddPlayer: (name: string, position: string) => Promise<void> | void;
 }
 
 export const RosterInviteModal: React.FC<RosterInviteModalProps> = ({
@@ -13,15 +13,24 @@ export const RosterInviteModal: React.FC<RosterInviteModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [position, setPosition] = useState('Midfield / CM');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onAddPlayer(name.trim(), position);
-    setName('');
-    onClose();
+
+    setIsSubmitting(true);
+    try {
+      await onAddPlayer(name.trim(), position);
+      setName('');
+      onClose();
+    } catch (error) {
+      console.error('Error adding player:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -29,7 +38,11 @@ export const RosterInviteModal: React.FC<RosterInviteModalProps> = ({
       <div className="bg-[#171f33] border border-[#2d3449] w-full max-w-sm rounded-2xl p-6 flex flex-col gap-4 animate-fade-in shadow-2xl">
         <div className="flex justify-between items-center border-b border-[#2d3449] pb-3">
           <h3 className="font-bold text-lg text-white">Invite Player to Roster</h3>
-          <button onClick={onClose} className="text-[#bbcabf] hover:text-white">
+          <button 
+            onClick={onClose} 
+            disabled={isSubmitting}
+            className="text-[#bbcabf] hover:text-white disabled:opacity-50"
+          >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -46,6 +59,7 @@ export const RosterInviteModal: React.FC<RosterInviteModalProps> = ({
               placeholder="e.g. Mateo Kovacic"
               className="w-full bg-[#222a3d] border border-[#2d3449] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#4edea3]"
               required
+              disabled={isSubmitting}
             />
           </div>
 
@@ -57,6 +71,7 @@ export const RosterInviteModal: React.FC<RosterInviteModalProps> = ({
               value={position}
               onChange={(e) => setPosition(e.target.value)}
               className="w-full bg-[#222a3d] border border-[#2d3449] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#4edea3]"
+              disabled={isSubmitting}
             >
               <option value="Forward / ST">Forward / ST</option>
               <option value="Winger / RW/LW">Winger / RW/LW</option>
@@ -69,9 +84,10 @@ export const RosterInviteModal: React.FC<RosterInviteModalProps> = ({
 
           <button
             type="submit"
-            className="w-full bg-[#4edea3] text-[#003824] font-extrabold h-11 rounded-xl text-sm shadow-md hover:bg-[#6ffbbe] transition-all mt-2"
+            disabled={isSubmitting}
+            className="w-full bg-[#4edea3] text-[#003824] font-extrabold h-11 rounded-xl text-sm shadow-md hover:bg-[#6ffbbe] transition-all mt-2 disabled:opacity-50 flex items-center justify-center"
           >
-            Add Player
+            {isSubmitting ? 'Adding...' : 'Add Player'}
           </button>
         </form>
       </div>

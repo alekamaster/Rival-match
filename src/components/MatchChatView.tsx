@@ -3,15 +3,15 @@ import { ActiveChat, ChatMessage } from '../types';
 import { USER_CAPTAIN } from '../data/mockData';
 
 interface MatchChatViewProps {
-  activeChats: ActiveChat[];
-  messages: Record<string, ChatMessage[]>;
-  onSendMessage: (matchId: string, text: string) => void;
+  activeChats?: ActiveChat[];
+  messages?: Record<string, ChatMessage[]>;
+  onSendMessage?: (matchId: string, text: string) => void;
   onBackClick?: () => void;
 }
 
 export const MatchChatView: React.FC<MatchChatViewProps> = ({
-  activeChats,
-  messages,
+  activeChats = [],
+  messages = {},
   onSendMessage,
   onBackClick,
 }) => {
@@ -21,13 +21,22 @@ export const MatchChatView: React.FC<MatchChatViewProps> = ({
   const [inputText, setInputText] = useState('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
+  // Sincronizar el chatId seleccionado cuando cambian los chats activos
+  useEffect(() => {
+    if (activeChats.length > 0 && !activeChats.some((c) => c.matchId === selectedChatId)) {
+      setSelectedChatId(activeChats[0].matchId);
+    }
+  }, [activeChats, selectedChatId]);
+
   const currentChat = activeChats.find((c) => c.matchId === selectedChatId) || activeChats[0];
   const currentMessages = messages[selectedChatId] || [];
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    onSendMessage(selectedChatId, inputText.trim());
+    if (onSendMessage) {
+      onSendMessage(selectedChatId, inputText.trim());
+    }
     setInputText('');
   };
 
@@ -50,7 +59,7 @@ export const MatchChatView: React.FC<MatchChatViewProps> = ({
                   : 'bg-[#222a3d] text-[#bbcabf] hover:text-white'
               }`}
             >
-              <span>{chat.title}</span>
+              <span>{chat.title || 'Match Chat'}</span>
             </button>
           ))}
         </div>
@@ -61,18 +70,18 @@ export const MatchChatView: React.FC<MatchChatViewProps> = ({
         <div className="flex justify-between items-start w-full">
           <div className="flex flex-col gap-1">
             <h2 className="font-semibold text-xl text-[#dae2fd]">
-              {currentChat?.title || 'City FC vs. The Lions'}
+              {currentChat?.title || 'City FC vs. Opponent'}
             </h2>
             <div className="flex items-center gap-2 text-[#bbcabf] text-sm">
               <span className="material-symbols-outlined text-[16px] text-[#4edea3]">
                 calendar_today
               </span>
-              <span>{currentChat?.timeLocation}</span>
+              <span>{currentChat?.timeLocation || 'Today'}</span>
               <span className="w-1 h-1 rounded-full bg-[#2d3449]" />
               <span className="material-symbols-outlined text-[16px] text-[#7bd0ff]">
                 stadium
               </span>
-              <span>{currentChat?.venue}</span>
+              <span>{currentChat?.venue || 'Local Turf Field'}</span>
             </div>
           </div>
 
@@ -94,67 +103,74 @@ export const MatchChatView: React.FC<MatchChatViewProps> = ({
           </span>
         </div>
 
-        {currentMessages.map((msg) => {
-          if (msg.isUser) {
-            return (
-              /* User Message (Right - Emerald) */
-              <div
-                key={msg.id}
-                className="flex flex-col items-end w-full max-w-[85%] self-end gap-1 animate-fade-in"
-              >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-xs font-bold text-[#bbcabf]">
-                    You ({USER_CAPTAIN.teamName})
-                  </span>
-                  <div className="w-6 h-6 rounded-full bg-[#4edea3]/20 flex items-center justify-center overflow-hidden border border-[#4edea3]/40">
-                    <img
-                      src={USER_CAPTAIN.avatar}
-                      alt="You"
-                      className="object-cover w-full h-full"
-                    />
+        {currentMessages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-[#bbcabf]/60 text-xs">
+            <span className="material-symbols-outlined text-3xl mb-2">chat_bubble_outline</span>
+            <span>No messages yet. Start coordinating the match!</span>
+          </div>
+        ) : (
+          currentMessages.map((msg) => {
+            if (msg.isUser) {
+              return (
+                /* User Message (Right - Emerald) */
+                <div
+                  key={msg.id}
+                  className="flex flex-col items-end w-full max-w-[85%] self-end gap-1 animate-fade-in"
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-xs font-bold text-[#bbcabf]">
+                      You ({USER_CAPTAIN?.teamName || 'Your Team'})
+                    </span>
+                    <div className="w-6 h-6 rounded-full bg-[#4edea3]/20 flex items-center justify-center overflow-hidden border border-[#4edea3]/40">
+                      <img
+                        src={USER_CAPTAIN?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                        alt="You"
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="bg-[#4edea3] px-4 py-3 rounded-2xl rounded-tr-sm text-[#003824] text-sm font-medium shadow-md relative group">
-                  {msg.text}
-                  <div className="flex items-center justify-end mt-1 text-[10px] text-[#003824]/70 gap-1 font-semibold">
-                    <span>{msg.time}</span>
-                    <span>Read</span>
-                    <span className="material-symbols-outlined text-[14px]">done_all</span>
+                  <div className="bg-[#4edea3] px-4 py-3 rounded-2xl rounded-tr-sm text-[#003824] text-sm font-medium shadow-md relative group">
+                    {msg.text}
+                    <div className="flex items-center justify-end mt-1 text-[10px] text-[#003824]/70 gap-1 font-semibold">
+                      <span>{msg.time || ''}</span>
+                      <span>Read</span>
+                      <span className="material-symbols-outlined text-[14px]">done_all</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          } else {
-            return (
-              /* Opponent Message (Left - Dark Surface) */
-              <div
-                key={msg.id}
-                className="flex flex-col items-start w-full max-w-[85%] gap-1 animate-fade-in"
-              >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <div className="w-6 h-6 rounded-full bg-[#222a3d] flex items-center justify-center overflow-hidden border border-[#2d3449]">
-                    <img
-                      src={msg.avatar}
-                      alt={msg.senderName}
-                      className="object-cover w-full h-full"
-                    />
+              );
+            } else {
+              return (
+                /* Opponent Message (Left - Dark Surface) */
+                <div
+                  key={msg.id}
+                  className="flex flex-col items-start w-full max-w-[85%] gap-1 animate-fade-in"
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <div className="w-6 h-6 rounded-full bg-[#222a3d] flex items-center justify-center overflow-hidden border border-[#2d3449]">
+                      <img
+                        src={msg.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                        alt={msg.senderName || 'Opponent'}
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                    <span className="text-xs font-bold text-[#bbcabf]">
+                      {msg.senderName || 'Captain'} ({msg.senderTeam || 'Opponent Team'})
+                    </span>
                   </div>
-                  <span className="text-xs font-bold text-[#bbcabf]">
-                    {msg.senderName} ({msg.senderTeam})
-                  </span>
-                </div>
 
-                <div className="bg-[#171f33] border border-[#2d3449] px-4 py-3 rounded-2xl rounded-tl-sm text-[#dae2fd] text-sm font-medium shadow-sm relative group">
-                  {msg.text}
-                  <div className="text-[10px] text-[#bbcabf] mt-1 text-right">
-                    {msg.time}
+                  <div className="bg-[#171f33] border border-[#2d3449] px-4 py-3 rounded-2xl rounded-tl-sm text-[#dae2fd] text-sm font-medium shadow-sm relative group">
+                    {msg.text}
+                    <div className="text-[10px] text-[#bbcabf] mt-1 text-right">
+                      {msg.time || ''}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          }
-        })}
+              );
+            }
+          })
+        )}
 
         <div ref={chatBottomRef} />
       </div>
@@ -168,6 +184,7 @@ export const MatchChatView: React.FC<MatchChatViewProps> = ({
           <button
             type="button"
             onClick={() =>
+              onSendMessage &&
               onSendMessage(
                 selectedChatId,
                 '📍 Sharing pitch location: Turf Field 2, Entrance B'
